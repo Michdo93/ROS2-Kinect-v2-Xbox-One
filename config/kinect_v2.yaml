@@ -1,0 +1,17 @@
+# ros2 launch kinect_v2_ros2 kinect_v2.launch.py [simulate:=true]
+/**:                             # any node name and namespace
+  ros__parameters:
+    simulate: false
+    serial: ""                  # empty: first Kinect v2
+    pipeline: cpu               # cpu | opengl | opencl | cuda (depth decoding)
+    frame_prefix: kinect_v2     # kinect_v2_link, ..._rgb_optical_frame, ..._ir_optical_frame
+    fps: 30.0                   # simulation only – the hardware always runs at 30 Hz
+    color_step: 2               # 1: 1920x1080 (~186 MB/s!), 2: 960x540, 4: 480x270
+    publish_ir: true
+    publish_registered: true    # colour mapped onto the depth image (512x424)
+    cloud_step: 2               # every 2nd pixel: 256 x 212 points
+    cloud_every: 3              # point cloud every 3rd frame (10 Hz), only with subscribers
+    reliable: true              # false: best effort ("sensor data") – better over Wi-Fi
+    audio: false                # microphone array via ALSA
+    audio_device: ""
+    audio_channels: 4
