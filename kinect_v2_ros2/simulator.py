@@ -54,7 +54,7 @@ class Simulator:
         img = np.zeros((h, w, 4), np.uint8)
         img[..., 0] = 128                                     # B
         img[..., 1] = (yy * 255 // max(h - 1, 1))             # G
-        img[..., 2] = (xx + int(t * 80)) % 256                # R
+        img[..., 2] = (xx * 255 // max(w - 1, 1))            # R
         for i, (y0, y1, x0, x1, _) in enumerate(self._boxes(t, w, h)):
             img[y0:y1, max(x0, 0):x1, :3] = (200, 90, 40) if i == 0 else (160, 190, 230)
         return img
