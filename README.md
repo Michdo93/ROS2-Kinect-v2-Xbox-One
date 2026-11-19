@@ -87,6 +87,13 @@ Parameters (`config/kinect_v2.yaml`):
 | `audio`, `audio_device`, `audio_channels` | false, "", 4 | microphone array via ALSA |
 | `fps` | 30.0 | simulation only |
 
+`color_step`, `publish_ir` and `publish_registered` can be changed while the node runs
+(`ros2 param set /kinect_v2/driver color_step 4`); all others only at start.
+
+Several Kinects: start the launch file once per device, e.g.
+`namespace:=kinect_flur serial:=<serial>` – the frames are named after the namespace.
+Each Kinect v2 needs its own USB 3.0 controller.
+
 ## Tests
 
 ```bash

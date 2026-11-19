@@ -12,6 +12,9 @@ Topics (below the node namespace, default /kinect_v2)
     depth/points           sensor_msgs/PointCloud2  xyz (+rgb), thinned out by cloud_step
     audio                  std_msgs/Int16MultiArray 16 kHz PCM, 4-channel mic array (ALSA)
 
+Parameters that can be changed while running (ros2 param set /kinect_v2/driver ...)
+    color_step, publish_ir, publish_registered – all others only at start
+
 simulate:=true produces a synthetic scene with the same topics – no Kinect needed.
 libfreenect2 has no skeleton tracking; use MediaPipe or similar on color/image_raw.
 """
@@ -22,6 +25,7 @@ import time
 import numpy as np
 import rclpy
 from geometry_msgs.msg import TransformStamped
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, qos_profile_sensor_data
@@ -40,6 +44,8 @@ from .geometry import (
     scaled,
 )
 from .simulator import Simulator
+
+RUNTIME = ("color_step", "publish_ir", "publish_registered")  # changeable while running
 
 
 class KinectV2Node(Node):
@@ -60,18 +66,16 @@ class KinectV2Node(Node):
         self.audio_device = dp("audio_device", "").value
         self.audio_channels = int(dp("audio_channels", 4).value)
         reliable = dp("reliable", True).value
+        self.add_on_set_parameters_callback(self._on_parameters)
 
         qos = QoSProfile(depth=2) if reliable else qos_profile_sensor_data
         pub = lambda t, typ: self.create_publisher(typ, t, qos)  # noqa: E731
-        self.pub_color, self.pub_color_info = pub("color/image_raw", Image), pub(
-            "color/camera_info", CameraInfo
-        )
-        self.pub_ir, self.pub_ir_info = pub("ir/image_raw", Image), pub(
-            "ir/camera_info", CameraInfo
-        )
-        self.pub_depth, self.pub_depth_info = pub("depth/image_raw", Image), pub(
-            "depth/camera_info", CameraInfo
-        )
+        self.pub_color = pub("color/image_raw", Image)
+        self.pub_color_info = pub("color/camera_info", CameraInfo)
+        self.pub_ir = pub("ir/image_raw", Image)
+        self.pub_ir_info = pub("ir/camera_info", CameraInfo)
+        self.pub_depth = pub("depth/image_raw", Image)
+        self.pub_depth_info = pub("depth/camera_info", CameraInfo)
         self.pub_registered = pub("registered/image_raw", Image)
         self.pub_cloud = pub("depth/points", PointCloud2)
         self.pub_audio = self.create_publisher(Int16MultiArray, "audio", 10)
@@ -98,6 +102,20 @@ class KinectV2Node(Node):
         self.get_logger().info(
             f"Kinect v2 {geraet}: colour 1/{self.color_step}, depth + IR 512x424"
         )
+
+    # ------------------------------------------------------------------ parameters
+    def _on_parameters(self, params):
+        for p in params:
+            if p.name not in RUNTIME:
+                return SetParametersResult(
+                    successful=False, reason=f"{p.name}: only at start (restart the node)"
+                )
+            if p.name == "color_step" and not 1 <= int(p.value) <= 8:
+                return SetParametersResult(successful=False, reason="color_step: 1 ... 8")
+        for p in params:
+            setattr(self, p.name, int(p.value) if p.name == "color_step" else p.value)
+            self.get_logger().info(f"{p.name} -> {p.value}")
+        return SetParametersResult(successful=True)
 
     def _static_tf(self):
         """link -> rgb optical frame, link -> ir optical frame (about 5 cm apart)."""
