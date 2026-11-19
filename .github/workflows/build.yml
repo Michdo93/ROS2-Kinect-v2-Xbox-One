@@ -3,13 +3,14 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         distro: [jazzy, lyrical]
     container: ros:${{ matrix.distro }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: src/kinect_v2_ros2
       - name: Dependencies
@@ -28,7 +29,6 @@ jobs:
         shell: bash
         run: |
           source install/setup.bash
-          timeout -s INT 15 ros2 launch kinect_v2_ros2 kinect_v2.launch.py simulate:=true &
-          sleep 8
-          timeout 10 ros2 topic echo --once --field encoding /kinect_v2/color/image_raw
-          wait || true
+          timeout -k 5 40 ros2 run kinect_v2_ros2 kinect_v2_node --ros-args -r __ns:=/kinect_v2 -p simulate:=true &
+          timeout -k 5 30 ros2 topic echo --once --field encoding /kinect_v2/color/image_raw
+          kill %1 2>/dev/null || true
