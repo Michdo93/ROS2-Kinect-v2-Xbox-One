@@ -1,4 +1,5 @@
 """Camera models, ROS message helpers and point cloud – numpy only, unit-tested."""
+
 import numpy as np
 
 COLOR_W, COLOR_H = 1920, 1080
@@ -16,7 +17,9 @@ def scaled(params, factor):
 def camera_info_fields(width, height, fx, fy, cx, cy):
     """Values for sensor_msgs/CameraInfo (plumb bob, distortion already removed)."""
     return {
-        "width": width, "height": height, "distortion_model": "plumb_bob",
+        "width": width,
+        "height": height,
+        "distortion_model": "plumb_bob",
         "d": [0.0] * 5,
         "k": [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0],
         "r": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
@@ -28,8 +31,14 @@ def image_fields(array, encoding):
     """Values for sensor_msgs/Image from a numpy array (rgb8, mono16, 16UC1)."""
     array = np.ascontiguousarray(array)
     height, width = array.shape[:2]
-    return {"height": height, "width": width, "encoding": encoding, "is_bigendian": 0,
-            "step": array.strides[0], "data": array.tobytes()}
+    return {
+        "height": height,
+        "width": width,
+        "encoding": encoding,
+        "is_bigendian": 0,
+        "step": array.strides[0],
+        "data": array.tobytes(),
+    }
 
 
 def bgrx_to_rgb(bgrx, step=1):
@@ -46,7 +55,7 @@ def float_to_u16(img, scale=1.0):
 def points_xyz(depth_mm, step=2, fx=365.5, fy=365.5, cx=255.5, cy=211.5, rgb=None):
     """Depth image in mm -> N x 3 float32 points in metres (optical frame, z forward)."""
     d = depth_mm[::step, ::step].astype(np.float32) / 1000.0
-    v, u = np.mgrid[0:depth_mm.shape[0]:step, 0:depth_mm.shape[1]:step]
+    v, u = np.mgrid[0 : depth_mm.shape[0] : step, 0 : depth_mm.shape[1] : step]
     valid = d > 0
     z = d[valid]
     pts = np.column_stack([(u[valid] - cx) * z / fx, (v[valid] - cy) * z / fy, z])

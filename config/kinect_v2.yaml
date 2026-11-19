@@ -4,7 +4,7 @@
     simulate: false
     serial: ""                  # empty: first Kinect v2
     pipeline: cpu               # cpu | opengl | opencl | cuda (depth decoding)
-    frame_prefix: kinect_v2     # kinect_v2_link, ..._rgb_optical_frame, ..._ir_optical_frame
+    frame_prefix: kinect_v2     # kinect_v2_link, _rgb_optical_frame, _ir_optical_frame
     fps: 30.0                   # simulation only – the hardware always runs at 30 Hz
     color_step: 2               # 1: 1920x1080 (~186 MB/s!), 2: 960x540, 4: 480x270
     publish_ir: true

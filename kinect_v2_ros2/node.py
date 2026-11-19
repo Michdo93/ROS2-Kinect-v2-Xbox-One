@@ -8,13 +8,14 @@ Topics (below the node namespace, default /kinect_v2)
     ir/image_raw           sensor_msgs/Image   mono16 512x424 (works in darkness)
     depth/image_raw        sensor_msgs/Image   16UC1 512x424, millimetres, undistorted
     depth/camera_info, ir/camera_info
-    registered/image_raw   sensor_msgs/Image   rgb8 512x424, colour mapped onto the depth image
+    registered/image_raw   sensor_msgs/Image   rgb8 512x424, colour mapped onto depth
     depth/points           sensor_msgs/PointCloud2  xyz (+rgb), thinned out by cloud_step
     audio                  std_msgs/Int16MultiArray 16 kHz PCM, 4-channel mic array (ALSA)
 
 simulate:=true produces a synthetic scene with the same topics – no Kinect needed.
 libfreenect2 has no skeleton tracking; use MediaPipe or similar on color/image_raw.
 """
+
 import threading
 import time
 
@@ -28,8 +29,16 @@ from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import Int16MultiArray, MultiArrayDimension
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 
-from .geometry import (COLOR_PARAMS, DEPTH_PARAMS, bgrx_to_rgb, camera_info_fields,
-                       float_to_u16, image_fields, points_xyz, scaled)
+from .geometry import (
+    COLOR_PARAMS,
+    DEPTH_PARAMS,
+    bgrx_to_rgb,
+    camera_info_fields,
+    float_to_u16,
+    image_fields,
+    points_xyz,
+    scaled,
+)
 from .simulator import Simulator
 
 
@@ -39,10 +48,10 @@ class KinectV2Node(Node):
         dp = self.declare_parameter
         self.simulate = dp("simulate", False).value
         self.serial = dp("serial", "").value
-        self.pipeline = dp("pipeline", "cpu").value          # cpu | opengl | opencl | cuda
+        self.pipeline = dp("pipeline", "cpu").value  # cpu | opengl | opencl | cuda
         self.frame_prefix = dp("frame_prefix", "kinect_v2").value
         self.fps = float(dp("fps", 30.0).value)
-        self.color_step = int(dp("color_step", 2).value)     # 1: 1920x1080, 2: 960x540
+        self.color_step = int(dp("color_step", 2).value)  # 1: 1920x1080, 2: 960x540
         self.publish_ir = dp("publish_ir", True).value
         self.publish_registered = dp("publish_registered", True).value
         self.cloud_step = int(dp("cloud_step", 2).value)
@@ -54,12 +63,15 @@ class KinectV2Node(Node):
 
         qos = QoSProfile(depth=2) if reliable else qos_profile_sensor_data
         pub = lambda t, typ: self.create_publisher(typ, t, qos)  # noqa: E731
-        self.pub_color, self.pub_color_info = pub("color/image_raw", Image), \
-            pub("color/camera_info", CameraInfo)
-        self.pub_ir, self.pub_ir_info = pub("ir/image_raw", Image), \
-            pub("ir/camera_info", CameraInfo)
-        self.pub_depth, self.pub_depth_info = pub("depth/image_raw", Image), \
-            pub("depth/camera_info", CameraInfo)
+        self.pub_color, self.pub_color_info = pub("color/image_raw", Image), pub(
+            "color/camera_info", CameraInfo
+        )
+        self.pub_ir, self.pub_ir_info = pub("ir/image_raw", Image), pub(
+            "ir/camera_info", CameraInfo
+        )
+        self.pub_depth, self.pub_depth_info = pub("depth/image_raw", Image), pub(
+            "depth/camera_info", CameraInfo
+        )
         self.pub_registered = pub("registered/image_raw", Image)
         self.pub_cloud = pub("depth/points", PointCloud2)
         self.pub_audio = self.create_publisher(Int16MultiArray, "audio", 10)
@@ -82,9 +94,10 @@ class KinectV2Node(Node):
             threading.Thread(target=self._run_freenect2, daemon=True).start()
             if self.audio_enabled:
                 self._start_audio()
+        geraet = "(simulated)" if self.simulate else self.serial or "(first device)"
         self.get_logger().info(
-            f"Kinect v2 {'(simulated)' if self.simulate else self.serial or '(first device)'}"
-            f": colour 1/{self.color_step}, depth + IR 512x424")
+            f"Kinect v2 {geraet}: colour 1/{self.color_step}, depth + IR 512x424"
+        )
 
     def _static_tf(self):
         """link -> rgb optical frame, link -> ir optical frame (about 5 cm apart)."""
@@ -111,40 +124,66 @@ class KinectV2Node(Node):
         stamp = self.get_clock().now().to_msg()
         rgb = bgrx_to_rgb(color_bgrx)
         c = scaled(self.color_params, 1.0 / self.color_step)
-        self.pub_color.publish(self._stamp(Image(**image_fields(rgb, "rgb8")), stamp,
-                                           self.color_frame))
-        self.pub_color_info.publish(self._stamp(
-            CameraInfo(**camera_info_fields(rgb.shape[1], rgb.shape[0], **c)), stamp,
-            self.color_frame))
+        self.pub_color.publish(
+            self._stamp(Image(**image_fields(rgb, "rgb8")), stamp, self.color_frame)
+        )
+        self.pub_color_info.publish(
+            self._stamp(
+                CameraInfo(**camera_info_fields(rgb.shape[1], rgb.shape[0], **c)),
+                stamp,
+                self.color_frame,
+            )
+        )
         depth = float_to_u16(depth_mm_f)
-        dinfo = CameraInfo(**camera_info_fields(depth.shape[1], depth.shape[0],
-                                                **self.depth_params))
-        self.pub_depth.publish(self._stamp(Image(**image_fields(depth, "16UC1")), stamp,
-                                           self.depth_frame))
+        dinfo = CameraInfo(
+            **camera_info_fields(depth.shape[1], depth.shape[0], **self.depth_params)
+        )
+        self.pub_depth.publish(
+            self._stamp(Image(**image_fields(depth, "16UC1")), stamp, self.depth_frame)
+        )
         self.pub_depth_info.publish(self._stamp(dinfo, stamp, self.depth_frame))
         if self.publish_ir and ir_f is not None:
-            self.pub_ir.publish(self._stamp(Image(**image_fields(float_to_u16(ir_f), "mono16")),
-                                            stamp, self.depth_frame))
+            self.pub_ir.publish(
+                self._stamp(
+                    Image(**image_fields(float_to_u16(ir_f), "mono16")),
+                    stamp,
+                    self.depth_frame,
+                )
+            )
             self.pub_ir_info.publish(self._stamp(dinfo, stamp, self.depth_frame))
         reg = bgrx_to_rgb(registered_bgrx) if registered_bgrx is not None else None
         if self.publish_registered and reg is not None:
-            self.pub_registered.publish(self._stamp(Image(**image_fields(reg, "rgb8")), stamp,
-                                                    self.depth_frame))
+            self.pub_registered.publish(
+                self._stamp(Image(**image_fields(reg, "rgb8")), stamp, self.depth_frame)
+            )
         self.frames += 1
-        if self.cloud_every > 0 and self.frames % self.cloud_every == 0 \
-                and self.pub_cloud.get_subscription_count() > 0:
+        if (
+            self.cloud_every > 0
+            and self.frames % self.cloud_every == 0
+            and self.pub_cloud.get_subscription_count() > 0
+        ):
             pts = points_xyz(depth, self.cloud_step, rgb=reg, **self.depth_params)
             self.pub_cloud.publish(self._cloud(pts, stamp))
 
     def _cloud(self, pts, stamp):
-        fields = [PointField(name=n, offset=4 * i, datatype=PointField.FLOAT32, count=1)
-                  for i, n in enumerate("xyz")]
+        fields = [
+            PointField(name=n, offset=4 * i, datatype=PointField.FLOAT32, count=1)
+            for i, n in enumerate("xyz")
+        ]
         if pts.shape[1] == 4:
-            fields.append(PointField(name="rgb", offset=12, datatype=PointField.FLOAT32,
-                                     count=1))
-        msg = PointCloud2(height=1, width=len(pts), fields=fields, is_bigendian=False,
-                          point_step=4 * pts.shape[1], row_step=4 * pts.shape[1] * len(pts),
-                          is_dense=True, data=np.ascontiguousarray(pts).tobytes())
+            fields.append(
+                PointField(name="rgb", offset=12, datatype=PointField.FLOAT32, count=1)
+            )
+        msg = PointCloud2(
+            height=1,
+            width=len(pts),
+            fields=fields,
+            is_bigendian=False,
+            point_step=4 * pts.shape[1],
+            row_step=4 * pts.shape[1] * len(pts),
+            is_dense=True,
+            data=np.ascontiguousarray(pts).tobytes(),
+        )
         return self._stamp(msg, stamp, self.depth_frame)
 
     def publish_audio(self, samples, rate=16000):
@@ -152,7 +191,8 @@ class KinectV2Node(Node):
         frames, channels = samples.shape if samples.ndim == 2 else (samples.size, 1)
         msg.layout.dim = [
             MultiArrayDimension(label=f"frames@{rate}Hz", size=frames, stride=samples.size),
-            MultiArrayDimension(label="channels", size=channels, stride=channels)]
+            MultiArrayDimension(label="channels", size=channels, stride=channels),
+        ]
         self.pub_audio.publish(msg)
 
     # ------------------------------------------------------------------ simulation
@@ -163,8 +203,9 @@ class KinectV2Node(Node):
         self.publish_frames(self.sim.color(t, self.color_step), depth, self.sim.ir(t), reg)
 
     def _simulate_audio(self):
-        self.publish_audio(self.sim.audio(time.monotonic() - self.t0,
-                                          channels=self.audio_channels))
+        self.publish_audio(
+            self.sim.audio(time.monotonic() - self.t0, channels=self.audio_channels)
+        )
 
     # ------------------------------------------------------------------ hardware
     def _run_freenect2(self):
@@ -173,8 +214,12 @@ class KinectV2Node(Node):
         except ImportError as e:
             self.get_logger().error(f"pylibfreenect2 missing: {e}")
             return
-        pipelines = {"cpu": "CpuPacketPipeline", "opengl": "OpenGLPacketPipeline",
-                     "opencl": "OpenCLPacketPipeline", "cuda": "CudaPacketPipeline"}
+        pipelines = {
+            "cpu": "CpuPacketPipeline",
+            "opengl": "OpenGLPacketPipeline",
+            "opencl": "OpenCLPacketPipeline",
+            "cuda": "CudaPacketPipeline",
+        }
         try:
             pipeline = getattr(f2, pipelines[self.pipeline])()
         except (AttributeError, KeyError, RuntimeError):
@@ -186,8 +231,9 @@ class KinectV2Node(Node):
             return
         serial = self.serial or fn.getDeviceSerialNumber(0)
         device = fn.openDevice(serial, pipeline=pipeline)
-        listener = f2.SyncMultiFrameListener(f2.FrameType.Color | f2.FrameType.Ir |
-                                             f2.FrameType.Depth)
+        listener = f2.SyncMultiFrameListener(
+            f2.FrameType.Color | f2.FrameType.Ir | f2.FrameType.Depth
+        )
         device.setColorFrameListener(listener)
         device.setIrAndDepthFrameListener(listener)
         device.start()
@@ -203,9 +249,12 @@ class KinectV2Node(Node):
                 color, ir, depth = frames["color"], frames["ir"], frames["depth"]
                 registration.apply(color, depth, undistorted, registered)
                 s = self.color_step
-                self.publish_frames(color.asarray()[::s, ::s].copy(),
-                                    undistorted.asarray(np.float32).copy(),
-                                    ir.asarray().copy(), registered.asarray(np.uint8).copy())
+                self.publish_frames(
+                    color.asarray()[::s, ::s].copy(),
+                    undistorted.asarray(np.float32).copy(),
+                    ir.asarray().copy(),
+                    registered.asarray(np.uint8).copy(),
+                )
                 listener.release(frames)
         finally:
             device.stop()
@@ -215,11 +264,20 @@ class KinectV2Node(Node):
         """The Kinect v2 microphone array is a standard USB audio device (4 channels)."""
         try:
             import sounddevice as sd
-            device = int(self.audio_device) if self.audio_device.isdigit() else \
-                (self.audio_device or None)
+
+            device = (
+                int(self.audio_device)
+                if self.audio_device.isdigit()
+                else (self.audio_device or None)
+            )
             self.audio_stream = sd.InputStream(
-                device=device, samplerate=16000, channels=self.audio_channels, dtype="int16",
-                blocksize=1600, callback=lambda data, *_: self.publish_audio(data.copy()))
+                device=device,
+                samplerate=16000,
+                channels=self.audio_channels,
+                dtype="int16",
+                blocksize=1600,
+                callback=lambda data, *_: self.publish_audio(data.copy()),
+            )
             self.audio_stream.start()
         except Exception as e:
             self.get_logger().warn(f"audio disabled: {e}")

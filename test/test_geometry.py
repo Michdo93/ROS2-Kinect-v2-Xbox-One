@@ -1,13 +1,18 @@
 import numpy as np
 
-from kinect_v2_ros2.geometry import (bgrx_to_rgb, camera_info_fields, float_to_u16,
-                                     points_xyz, scaled)
+from kinect_v2_ros2.geometry import (
+    bgrx_to_rgb,
+    camera_info_fields,
+    float_to_u16,
+    points_xyz,
+    scaled,
+)
 from kinect_v2_ros2.simulator import Simulator
 
 
 def test_bgrx_to_rgb_and_step():
     bgrx = np.zeros((1080, 1920, 4), np.uint8)
-    bgrx[..., 0], bgrx[..., 2] = 10, 200       # B, R
+    bgrx[..., 0], bgrx[..., 2] = 10, 200  # B, R
     rgb = bgrx_to_rgb(bgrx[::2, ::2])
     assert rgb.shape == (540, 960, 3) and tuple(rgb[0, 0]) == (200, 0, 10)
 
