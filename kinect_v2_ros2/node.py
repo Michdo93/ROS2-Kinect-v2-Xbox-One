@@ -314,6 +314,9 @@ def main(args=None):
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
+    except Exception:
+        if rclpy.ok():  # harmless during shutdown: the context is already gone
+            raise
     finally:
         try:
             node.destroy_node()
