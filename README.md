@@ -108,6 +108,11 @@ python3 -m pytest -q test          # geometry, point cloud, simulator – no ROS
   openHAB
 * Book *Smart Home & ROS2* (Praxisreihe Smart Home) by Michael Christian Dörflinger
 
+## Support
+
+If this repository helps you, you can buy the author a coffee:
+https://buymeacoffee.com/Michdo93
+
 ## License
 
 MIT

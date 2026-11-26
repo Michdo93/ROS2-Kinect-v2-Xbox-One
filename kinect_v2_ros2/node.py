@@ -230,7 +230,10 @@ class KinectV2Node(Node):
         try:
             import pylibfreenect2 as f2
         except ImportError as e:
-            self.get_logger().error(f"pylibfreenect2 missing: {e}")
+            self._fatal(
+                f"pylibfreenect2 missing ({e}) - install libfreenect2 and "
+                "pylibfreenect2 or start with simulate:=true"
+            )
             return
         pipelines = {
             "cpu": "CpuPacketPipeline",
@@ -245,7 +248,7 @@ class KinectV2Node(Node):
             pipeline = f2.CpuPacketPipeline()
         fn = f2.Freenect2()
         if fn.enumerateDevices() == 0:
-            self.get_logger().error("no Kinect v2 found (USB 3.0 and power supply?)")
+            self._fatal("no Kinect v2 found (USB 3.0 and power supply?)")
             return
         serial = self.serial or fn.getDeviceSerialNumber(0)
         device = fn.openDevice(serial, pipeline=pipeline)
@@ -277,6 +280,12 @@ class KinectV2Node(Node):
         finally:
             device.stop()
             device.close()
+
+    def _fatal(self, text):
+        """Hardware is gone: report it and stop the node instead of publishing nothing."""
+        self.get_logger().error(text)
+        self.running = False
+        rclpy.try_shutdown()
 
     def _start_audio(self):
         """The Kinect v2 microphone array is a standard USB audio device (4 channels)."""
